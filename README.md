@@ -29,9 +29,9 @@ And since I haven't written any code yet, the rest of this is a design doc.
 * Use a channel to communicate received events back to main thread
 
 
-    type EventReceiver interface {
-        Run(events chan) chan // Takes a channel to send events back on, returns a channel to control it via.
-    }
+      type EventReceiver interface {
+          Run(events chan) chan // Takes a channel to send events back on, returns a channel to control it via.
+      }
 
 ## Monitoring daemon
 
@@ -42,43 +42,42 @@ And since I haven't written any code yet, the rest of this is a design doc.
 * The above sounds good. Then the API just returns the latest health check's result.
 * So, Helios's main daemon needs to loop repeatedly, check threshold severities, and store the health check.
 
+      package Helios
 
-    package Helios
+      type EventType struct {
+          name            string      // not really, but roll with it
+          expectedFreq    Frequency   // like a cron thing
+      }
 
-    type EventType struct {
-        name            string      // not really, but roll with it
-        expectedFreq    Frequency   // like a cron thing
-    }
+      type Threshold struct {
+          name            string
+          eventType       EventType
+          maxVariance     time.Duration
+      }
 
-    type Threshold struct {
-        name            string
-        eventType       EventType
-        maxVariance     time.Duration
-    }
+      func CheckThreshold(th Threshold) {
+          db  := MagicDatabaseThing.New()
+          sev := GetThresholdSeverity(db, th)
+          StoreHealthCheck(db, th, sev)
+      }
 
-    func CheckThreshold(th Threshold) {
-        db  := MagicDatabaseThing.New()
-        sev := GetThresholdSeverity(db, th)
-        StoreHealthCheck(db, th, sev)
-    }
+      func GetThresholdSeverity(db MagicDatabaseThing, th Threshold) (severity int) {
+          severity    := 0
+          t0          := db.GetLatestOccurrence(th.eventType)
+          t1          := th.eventType.ClosestExpectedOccurrence(time.Now())
 
-    func GetThresholdSeverity(db MagicDatabaseThing, th Threshold) (severity int) {
-        severity    := 0
-        t0          := db.GetLatestOccurrence(th.eventType)
-        t1          := th.eventType.ClosestExpectedOccurrence(time.Now())
+          if Math.abs(t1 - t0) > th.maxVariance {
+              severity = 100; // not really
+          else {
+              severity = 0;   // ... well, maybe, if there's a binary threshold limit
+          }
 
-        if Math.abs(t1 - t0) > th.maxVariance {
-            severity = 100; // not really
-        else {
-            severity = 0;   // ... well, maybe, if there's a binary threshold limit
-        }
+          return
+      }
 
-        return
-    }
-
-    func StoreHealthCheck(db MagicDatabaseThing, th Threshold, sev int) {
-        db.InsertHealthCheck(th.name, th.eventType, time.Now(), sev)
-    }
+      func StoreHealthCheck(db MagicDatabaseThing, th Threshold, sev int) {
+          db.InsertHealthCheck(th.name, th.eventType, time.Now(), sev)
+      }
 
 ## API
 
