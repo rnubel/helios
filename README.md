@@ -28,6 +28,7 @@ And since I haven't written any code yet, the rest of this is a design doc.
 * Spawn off of main process upon starting up
 * Use a channel to communicate received events back to main thread
 
+
     type EventReceiver interface {
         Run(events chan) chan // Takes a channel to send events back on, returns a channel to control it via.
     }
@@ -40,6 +41,7 @@ And since I haven't written any code yet, the rest of this is a design doc.
   health of the system.
 * The above sounds good. Then the API just returns the latest health check's result.
 * So, Helios's main daemon needs to loop repeatedly, check threshold severities, and store the health check.
+
 
     package Helios
 
@@ -82,7 +84,7 @@ And since I haven't written any code yet, the rest of this is a design doc.
 
 * Pretty straightforward implementation
 * API resources:
-** `/v1/event_types`
-** `/v1/thresholds`
-** `/v1/thresholds/:threshold/status`
-** `/v1/status`
+    * `/v1/event_types`
+    * `/v1/thresholds`
+    * `/v1/thresholds/:threshold/status`
+    * `/v1/status`
