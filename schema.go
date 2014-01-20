@@ -1,4 +1,4 @@
-package helios
+package main
 
 import (
   "database/sql"
