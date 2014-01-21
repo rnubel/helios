@@ -49,6 +49,7 @@ func dbSetup() {
     fmt.Println("Failed to open database connection:", err)
     return
   }
+  defer db.Close()
 
   err = helios.LoadDatabaseSchema(db)
 

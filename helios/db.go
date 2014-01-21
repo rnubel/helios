@@ -6,5 +6,5 @@ import (
 )
 
 func OpenDatabaseConnection() (*sql.DB, error) {
-  return sql.Open("sqlite3", "helios.db")
+  return sqlite3.Open("helios.db")
 }
