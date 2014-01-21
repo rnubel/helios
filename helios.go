@@ -4,10 +4,11 @@ import (
   "flag"
   "fmt"
   "os"
+  "github.com/rnubel/helios/helios"
 )
 
 func main() {
-  // command-line syntax: helios [COMMAND] [ [FLAGS] ]
+  // command-line syntax: helios COMMAND [FLAGS]
   flag.Parse()
   if flag.NArg() == 0 {
     displayHelp()
@@ -35,17 +36,21 @@ func main() {
 }
 
 func displayHelp() {
-  fmt.Println("Helios - help")
+  fmt.Println("Helios - Application Monitoring Tool")
+  fmt.Println("usage: helios COMMAND [FLAGS]")
+  fmt.Println("")
+  fmt.Println("Available commands:")
+  fmt.Println("  db setup              Creates the Helios schema")
 }
 
 func dbSetup() {
-  db, err := OpenDatabaseConnection()
+  db, err := helios.OpenDatabaseConnection()
   if err != nil {
     fmt.Println("Failed to open database connection:", err)
     return
   }
 
-  err = LoadDatabaseSchema(db)
+  err = helios.LoadDatabaseSchema(db)
 
   if err != nil {
     fmt.Println("Error when loading database schema:", err)
