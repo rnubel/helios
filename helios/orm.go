@@ -2,6 +2,7 @@ package helios
 
 import (
   "database/sql"
+  "fmt"
 )
 
 type ORM struct {
@@ -62,18 +63,49 @@ func (o *ORM) LoadEvent(eventId int64) (*Event, error) {
   return &e, nil
 }
 
-func (o *ORM) CreateEvent(name, expectedFrequency string) (*Event, error) {
-  _, err := o.db.Exec(
-    `INSERT INTO events (name, expected_frequency)
-     VALUES (?, ?)`,
-     name, expectedFrequency)
+func (o *ORM) SaveEvent(event *Event) error {
+  var err error
 
-  if err != nil {
-    return nil, err
+  update := event.EventId != 0
+
+  if update { // existing event
+    fmt.Println("Updating! new name", event.Name)
+    _, err = o.db.Exec( `UPDATE events
+                         SET name = ?, expected_frequency = ?
+                         WHERE event_id = ?;`,
+                         event.Name, event.ExpectedFrequency, event.EventId)
+    fmt.Println(err)
+  } else {
+    _, err = o.db.Exec( `INSERT INTO events (name, expected_frequency)
+                         VALUES (?, ?);`,
+                         event.Name, event.ExpectedFrequency)
   }
 
-  eventId := o.LastInsertId("events", "event_id")
-  e, err := o.LoadEvent(eventId)
+  if err != nil {
+    return err
+  }
 
-  return e, nil
+
+  if !update {
+    event.EventId = o.LastInsertId("events", "event_id")
+  }
+
+  return nil
 }
+
+
+//func (o *ORM) CreateEventOccurrence(eventId int64, occurredAt time.Time) (*EventOccurrence, error) {
+//  _, err := o.db.Exec(
+//    `INSERT INTO event_occurrences (event_id, occurred_at)
+//     VALUES (?, ?)`,
+//     eventId, occurredAt)
+//
+//  if err != nil {
+//    return nil, err
+//  }
+//
+//  eventId := o.LastInsertId("events", "event_id")
+//  e, err := o.LoadEventOccurrence(eventId)
+//
+//  return e, nil
+//}

@@ -13,7 +13,7 @@ var (
 )
 
 func doSetup() {
-  dbName  := "helios_test.db"
+  dbName  := "file:helios_test.db?cache=shared&mode=rwc"
   db, _   = sql.Open("sqlite3", dbName)
   orm   = NewORM(db)
 
@@ -28,7 +28,8 @@ func doCleanup() {
 func TestEventCreate(t *testing.T) {
   doSetup()
 
-  event, err := orm.CreateEvent("test/metric", "* * * * *")
+  event := &Event{Name: "test/metric", ExpectedFrequency: "* * * * *"}
+  err := orm.SaveEvent(event)
 
   if err != nil {
     t.Log("Error raised on creating event:", err)
@@ -110,6 +111,38 @@ func TestEventList(t *testing.T) {
   if events[0].Name != "asdf/foo" || events[1].Name != "asdf/bar" {
     // DBMS-dependent test, unless I add an ORDER BY.
     t.Log("Events loaded in wrong order:", events)
+    t.Fail()
+  }
+
+  doCleanup()
+}
+
+func TestEventUpdate(t *testing.T) {
+  doSetup()
+
+  db.Exec(`INSERT INTO events (name, expected_frequency)
+           VALUES (?, ?)`, "asdf/foo", "asdf")
+
+  id := orm.LastInsertId("events", "event_id")
+  event, err := orm.LoadEvent(id)
+
+  if err != nil { t.Log(err); t.Fail() }
+
+  event.Name = "asdf/baz"
+  err = orm.SaveEvent(event)
+
+  if err != nil {
+    t.Log("Error when updating event:", err)
+    t.Fail()
+  }
+
+  stmt, err := db.Query(`SELECT name FROM events WHERE event_id = ?`, id)
+  stmt.Next()
+  var test string
+  stmt.Scan(&test)
+
+  if test != "asdf/baz" {
+    t.Log("Name did not update; is currently", test, "instead of asdf/baz")
     t.Fail()
   }
 
