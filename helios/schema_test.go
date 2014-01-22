@@ -55,6 +55,13 @@ func TestSchemaLoad(t *testing.T) {
     t.Fail()
   }
 
+  // Test uniqueness
+  _, err = db.Exec("INSERT INTO events (name, expected_frequency)                               VALUES ('helios/events/test', '* * * * *');")
+  if (err != nil) {
+    t.Log("Duplicate names allowed in events table!")
+    t.Fail()
+  }
+
   db.Close()
 }
 
