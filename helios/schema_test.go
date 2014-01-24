@@ -3,7 +3,7 @@ package helios
 import (
   "testing"
   "database/sql"
-  _ "code.google.com/p/go-sqlite/go1/sqlite3"
+  _ "github.com/mattn/go-sqlite3"
 )
 
 func createTestDatabase() (*sql.DB, error) {

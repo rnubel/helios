@@ -2,7 +2,7 @@ package helios
 
 import (
   "database/sql"
-  _ "code.google.com/p/go-sqlite/go1/sqlite3"
+  _ "github.com/mattn/go-sqlite3"
 )
 
 func OpenDatabaseConnection() (*sql.DB, error) {

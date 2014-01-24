@@ -4,7 +4,8 @@ import (
   "testing"
   "database/sql"
   "os"
-  _ "code.google.com/p/go-sqlite/go1/sqlite3"
+  "time"
+  _ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -27,6 +28,7 @@ func doCleanup() {
 
 func TestEventCreate(t *testing.T) {
   doSetup()
+  defer doCleanup()
 
   event := &Event{Name: "test/metric", ExpectedFrequency: "* * * * *"}
   err := orm.SaveEvent(event)
@@ -39,7 +41,6 @@ func TestEventCreate(t *testing.T) {
   if event == nil {
     t.Log("Event was not loaded! Null pointer!")
     t.Fail()
-    return
   }
 
   if event.Name != "test/metric" {
@@ -52,27 +53,28 @@ func TestEventCreate(t *testing.T) {
     t.Fail()
   }
 
-  _, err = db.Query("SELECT * FROM events WHERE event_id = ?", event.EventId)
+  stmt, err := db.Query("SELECT * FROM events WHERE event_id = ?", event.EventId)
+  defer stmt.Close()
   if err != nil {
     t.Log("Was not able to retrieve the created event; err:", err)
     t.Fail()
   }
-
-  doCleanup()
 }
 
 func TestEventLoad(t *testing.T) {
   doSetup()
+  defer doCleanup()
 
   _, err := db.Exec(
     `INSERT INTO events (name, expected_frequency)
      VALUES (?, ?)`, "asdf/foo", "asdf")
 
   if err != nil {
+    t.Log("Error when creating event:", err)
     t.Fail()
   }
 
-  id := orm.LastInsertId("events", "event_id")
+  id, _ := orm.LastInsertId("events", "event_id")
   event, err := orm.LoadEvent(id)
 
   if err != nil {
@@ -81,15 +83,14 @@ func TestEventLoad(t *testing.T) {
   }
 
   if event.Name != "asdf/foo" || event.ExpectedFrequency != "asdf" {
-    t.Log("Columns mapped incorrectly: ", event.Name, event.ExpectedFrequency)
+    t.Log("Columns mapped incorrectly:", event.Name, event.ExpectedFrequency)
     t.Fail()
   }
-
-  doCleanup()
 }
 
 func TestEventList(t *testing.T) {
   doSetup()
+  defer doCleanup()
 
   db.Exec(
     `INSERT INTO events (name, expected_frequency)
@@ -113,17 +114,18 @@ func TestEventList(t *testing.T) {
     t.Log("Events loaded in wrong order:", events)
     t.Fail()
   }
-
-  doCleanup()
 }
 
 func TestEventUpdate(t *testing.T) {
   doSetup()
+  defer doCleanup()
 
-  db.Exec(`INSERT INTO events (name, expected_frequency)
+  tx, _ := db.Begin()
+  tx.Exec(`INSERT INTO events (name, expected_frequency)
            VALUES (?, ?)`, "asdf/foo", "asdf")
+  tx.Commit()
 
-  id := orm.LastInsertId("events", "event_id")
+  id, _ := orm.LastInsertId("events", "event_id")
   event, err := orm.LoadEvent(id)
 
   if err != nil { t.Log(err); t.Fail() }
@@ -137,6 +139,7 @@ func TestEventUpdate(t *testing.T) {
   }
 
   stmt, err := db.Query(`SELECT name FROM events WHERE event_id = ?`, id)
+  defer stmt.Close()
   stmt.Next()
   var test string
   stmt.Scan(&test)
@@ -145,6 +148,31 @@ func TestEventUpdate(t *testing.T) {
     t.Log("Name did not update; is currently", test, "instead of asdf/baz")
     t.Fail()
   }
+}
 
-  doCleanup()
+func TestEventOccurrences(t *testing.T) {
+  doSetup()
+  defer doCleanup()
+
+  event := &Event{Name: "test/metric", ExpectedFrequency: "* * * * *"}
+  err := orm.SaveEvent(event)
+  if (err != nil) { t.Log(err); t.Fail(); return }
+
+  occurrence := &EventOccurrence{EventId: event.EventId, OccurredAt: time.Now()}
+  err = orm.SaveEventOccurrence(occurrence)
+
+  if (err != nil) { t.Log(err); t.Fail(); return }
+
+  if occurrence.EventOccurrenceId == 0 {
+    t.Log("EventOccurenceId was not attached to object after saving; occ:", occurrence)
+    t.Fail()
+    return
+ }
+
+  rows, err := db.Query("SELECT * FROM event_occurrences WHERE event_id = ?", event.EventId);
+  defer rows.Close()
+  if !rows.Next() { // error raised; no results
+    t.Log("Object was not inserted into database for real")
+    t.Fail()
+  }
 }
