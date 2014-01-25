@@ -32,7 +32,7 @@ func LoadDatabaseSchema(db *sql.DB) error {
     CREATE TABLE event_occurrences (
       event_occurrence_id INTEGER                     PRIMARY KEY AUTOINCREMENT,
       event_id            INTEGER                     NOT NULL,
-      occurred_at         TIMESTAMP WITHOUT TIME ZONE NOT NULL
+      occurred_at         TIMESTAMP NOT NULL
     );
     `
   _, err = db.Exec(sql)

@@ -11,19 +11,24 @@ import (
 var (
   db        *sql.DB
   orm       *ORM
+  removeDB  bool
 )
 
 func doSetup() {
-  dbName  := "file:helios_test.db?cache=shared&mode=rwc"
-  db, _   = sql.Open("sqlite3", dbName)
-  orm   = NewORM(db)
+  dbName    := "file:helios_test.db?cache=shared&mode=rwc"
+  db, _     = sql.Open("sqlite3", dbName)
+  removeDB  = true
+  orm       = NewORM(db)
 
   LoadDatabaseSchema(db)
 }
 
 func doCleanup() {
   db.Close()
-  os.Remove("helios_test.db")
+
+  if removeDB {
+    os.Remove("helios_test.db")
+  }
 }
 
 func TestEventCreate(t *testing.T) {
@@ -84,6 +89,12 @@ func TestEventLoad(t *testing.T) {
 
   if event.Name != "asdf/foo" || event.ExpectedFrequency != "asdf" {
     t.Log("Columns mapped incorrectly:", event.Name, event.ExpectedFrequency)
+    t.Fail()
+  }
+
+  event, err = orm.LoadEvent(100000) // non-existent
+  if err == nil {
+    t.Log("Loading non-existent event did not raise an error!")
     t.Fail()
   }
 }
@@ -156,12 +167,12 @@ func TestEventOccurrences(t *testing.T) {
 
   event := &Event{Name: "test/metric", ExpectedFrequency: "* * * * *"}
   err := orm.SaveEvent(event)
-  if (err != nil) { t.Log(err); t.Fail(); return }
+  if err != nil { t.Fatal(err) }
 
   occurrence := &EventOccurrence{EventId: event.EventId, OccurredAt: time.Now()}
   err = orm.SaveEventOccurrence(occurrence)
 
-  if (err != nil) { t.Log(err); t.Fail(); return }
+  if err != nil { t.Fatal(err) }
 
   if occurrence.EventOccurrenceId == 0 {
     t.Log("EventOccurenceId was not attached to object after saving; occ:", occurrence)
@@ -169,10 +180,23 @@ func TestEventOccurrences(t *testing.T) {
     return
  }
 
-  rows, err := db.Query("SELECT * FROM event_occurrences WHERE event_id = ?", event.EventId);
+  rows, err := db.Query("SELECT occurred_at FROM event_occurrences WHERE event_id = ?", event.EventId);
   defer rows.Close()
   if !rows.Next() { // error raised; no results
     t.Log("Object was not inserted into database for real")
     t.Fail()
+  } else {
+    var at time.Time
+    rows.Scan(&at)
+    if at != occurrence.OccurredAt.UTC() {
+      t.Fatal("Expected", occurrence.OccurredAt.UTC(), "got", at, "for the occurred_at field!")
+    }
+  }
+
+  dup_occurrence, err := orm.LoadEventOccurrence(occurrence.EventOccurrenceId)
+  if err != nil { t.Fatal(err) }
+
+  if dup_occurrence.EventId != occurrence.EventId || dup_occurrence.OccurredAt != occurrence.OccurredAt {
+    t.Fatal("Loading occurrence did not work properly:", dup_occurrence, "vs", occurrence)
   }
 }

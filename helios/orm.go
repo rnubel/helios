@@ -2,6 +2,7 @@ package helios
 
 import (
   "database/sql"
+  "errors"
 )
 
 type ORM struct {
@@ -48,21 +49,22 @@ func (o *ORM) ListEvents() ([]*Event, error) {
 }
 
 func (o *ORM) LoadEvent(eventId int64) (*Event, error) {
-  row, err := o.db.Query(`
-    SELECT event_id, name, expected_frequency
-    FROM events
-    WHERE event_id = ?
-  `, eventId);
+  row, err := o.db.Query(` SELECT event_id, name, expected_frequency
+                           FROM events
+                           WHERE event_id = ?
+                         `, eventId);
   defer row.Close()
 
   if err != nil {
     return nil, err
   }
 
+  if !row.Next() {
+    return nil, errors.New("Event not found!")
+  }
+
   e := Event{}
-  row.Next()
   row.Scan(&e.EventId, &e.Name, &e.ExpectedFrequency)
-  row.Close()
 
   return &e, nil
 }
@@ -90,6 +92,27 @@ func (o *ORM) SaveEvent(event *Event) (err error) {
   return nil
 }
 
+func (o *ORM) LoadEventOccurrence(eventOccurrenceId int64) (*EventOccurrence, error) {
+  row, err := o.db.Query(` SELECT event_occurrence_id, event_id, occurred_at
+                           FROM event_occurrences
+                           WHERE event_occurrence_id = ?
+                         `, eventOccurrenceId);
+  defer row.Close()
+
+  if err != nil {
+    return nil, err
+  }
+
+  if !row.Next() {
+    return nil, errors.New("EventOccurrence not found!")
+  }
+
+  eo := EventOccurrence{}
+  row.Scan(&eo.EventOccurrenceId, &eo.EventId, &eo.OccurredAt)
+  eo.OccurredAt = eo.OccurredAt.Local()
+
+  return &eo, nil
+}
 
 func (o *ORM) SaveEventOccurrence(occurrence *EventOccurrence) (err error) {
   update  := occurrence.EventOccurrenceId != 0
@@ -98,11 +121,11 @@ func (o *ORM) SaveEventOccurrence(occurrence *EventOccurrence) (err error) {
     _, err = o.db.Exec( `UPDATE event_occurrences
                          SET    event_id = ?, occurred_at = ?
                          WHERE  event_occurrence_id = ?;`,
-                         occurrence.EventId, occurrence.OccurredAt, occurrence.EventOccurrenceId)
+                         occurrence.EventId, occurrence.OccurredAt.UTC(), occurrence.EventOccurrenceId)
   } else {
     _, err = o.db.Exec( `INSERT INTO event_occurrences (event_id, occurred_at)
                          VALUES (?, ?)`,
-                         occurrence.EventId, occurrence.OccurredAt)
+                         occurrence.EventId, occurrence.OccurredAt.UTC())
   }
 
   if err != nil { return err }
